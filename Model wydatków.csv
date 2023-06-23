@@ -1,0 +1,134 @@
+import os
+from datetime import datetime
+import pandas as pd
+
+#Model wydatków pomagający zarządzać budżetem
+class Expense:
+    def __init__(self, description, cost, date):
+        self.description = description
+        self.cost = cost
+        self.date = date
+
+
+    def __str__(self):
+        return f"{self.description} - {self.cost} zł - {self.date}"
+
+
+class MonthlyBudget:
+    def __init__(self, filename):
+        self.expenses = []
+        self.total_cost = 0
+        self.filename = filename
+        
+        
+    def add_expense(self, expense):
+        self.expenses.append(expense)
+        self.total_cost += expense.cost
+
+
+    def get_total_expenses(self):
+        return self.total_cost
+
+#zapis od pliku po kolumnach
+    def save_to_csv(self):
+        try:
+            description = input("Podaj opis wydatku: ")
+            cost = float(input("Podaj koszt wydatku: "))
+            date = datetime.strptime(input("Podaj datę wydatku (YYYY-MM-DD): "), "%Y-%m-%d")
+        except ValueError as e:
+            print(e)
+            return
+        if not os.path.exists(self.filename):
+            # Create a new dataframe with columns 'Description', 'Date', and 'Cost'
+            df = pd.DataFrame({'Description': [description], 'Date': [date], 'Cost': [cost]})
+            df.to_csv(self.filename, index=False, mode='a', header=True)
+        else:
+            # Read the existing CSV file
+            df = pd.DataFrame({'Description': [description], 'Date': [date], 'Cost': [cost]})
+            df.to_csv(self.filename, index=False, mode='a', header=False)
+            
+#odnosnik do metody remove           
+    def remove_expense(self, description, date):
+        df = pd.read_csv(self.filename)
+        df = df[(df['Description'] != description) | (df['Date'] != date.strftime('%Y-%m-%d'))]
+        df.to_csv(self.filename, index=False)
+
+#glowna metoda remove
+    def remove_expense_by_user_input(self):
+        description = input("Podaj opis wydatku, który chcesz usunąć: ")
+        date = input("Podaj datę wydatku, który chcesz usunąć (YYYY-MM-DD): ")
+        try:
+            date = datetime.strptime(date, '%Y-%m-%d')
+        except ValueError as e:
+            print(e)
+            return
+        self.remove_expense(description, date)
+
+#srednia z miesiąca
+    def average_cost_by_month(self, month):        
+        df = pd.read_csv(self.filename)
+        df['Date'] = pd.to_datetime(df['Date'])
+        df = df[df['Date'].dt.month == month]
+        return df['Cost'].mean()
+
+#wydatki po dacie
+    def expenses_by_date_from_csv(self, date):
+        try:
+            date = datetime.strptime(date, '%Y-%m-%d')
+        except ValueError as e:
+            print(e)
+            return
+        df = pd.read_csv(self.filename)
+        df['Date'] = pd.to_datetime(df['Date'])
+        condition = df['Date'] == date
+        df = df[condition]
+
+        return df['Cost'].sum()
+    def check_monthly_budget(self, month):
+        budget = float(input("Podaj swój budżet miesięczny: "))
+        df = pd.read_csv(self.filename)
+        df['Date'] = pd.to_datetime(df['Date'])
+        df = df[df['Date'].dt.month == month]
+        month_expenses = df['Cost'].sum()
+        
+        if month_expenses > budget:
+            print(f"Przekroczyłeś swój budżet miesięczny o {month_expenses - budget} zł.")
+        else:
+            print(f"Do przekroczenia budżetu pozostało Ci {budget - month_expenses} zł.")
+
+#wybór opcji
+    def main_loop(self):
+        while True:
+            print("1. Dodaj wydatek")
+            print("2. Usuń wydatek")
+            print("3. Srednie wydatki z miesiąca")
+            print("4. Wydatki po konkretnej dacie")
+            print("5. Sprawdzenie przekroczenia budżetu miesięcznego")
+            print("6. Wyjscie")
+            choice = input("Wybierz : ")
+            if choice == "1":
+                self.save_to_csv()
+            elif choice == "2":
+                self.remove_expense_by_user_input()
+            elif choice == "3":
+                month = int(input("Podaj miesiąc (1-12): "))
+                avg_cost = self.average_cost_by_month(month)
+                print("Sredni wydatek z miesiaca {}: {}".format(month, avg_cost))
+            elif choice == "4":
+                date = input("Podaj datę (YYYY-MM-DD): ")
+                print(self.expenses_by_date_from_csv(date))
+            elif choice == "5":
+                month = int(input("Podaj miesiąc (1-12): "))
+                self.check_monthly_budget(month)
+            elif choice == "6":
+                break 
+            else:
+                print("Błąd.")
+            
+        
+
+#main
+if __name__ == "__main__":
+    filename = input("Podaj nazwę pliku np. test.csv: ")
+    budget = MonthlyBudget(filename)
+    budget.main_loop()
